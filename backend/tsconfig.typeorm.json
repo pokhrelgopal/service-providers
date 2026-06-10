@@ -1,0 +1,8 @@
+{
+  "extends": "./tsconfig.json",
+  "comment": "ts-node config for the TypeORM CLI — forces CommonJS so migrations run via ts-node.",
+  "compilerOptions": {
+    "module": "commonjs",
+    "moduleResolution": "node"
+  }
+}

@@ -1,0 +1,78 @@
+# Local dev infrastructure for the Servio marketplace.
+# Host ports are deliberately non-default (5434/6381/9004/9005/8083) to avoid
+# colliding with other local stacks (celiora, showcase). Container-internal
+# ports stay standard. The backend runs on the host (npm run start:dev) and
+# talks to these via the mapped host ports — see backend/.env.
+
+name: servio
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: servio-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: marketplace
+    ports:
+      - "5434:5432"
+    volumes:
+      - servio-pgdata:/var/lib/postgresql/data
+      # Runs once on an empty data dir: enables cube + earthdistance.
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d marketplace"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: servio-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6381:6379"
+    volumes:
+      - servio-redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    container_name: servio-minio
+    restart: unless-stopped
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9004:9000" # S3 API
+      - "9005:9001" # Web console
+    volumes:
+      - servio-miniodata:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Optional DB UI — start with: docker compose --profile tools up
+  adminer:
+    image: adminer:latest
+    container_name: servio-adminer
+    restart: unless-stopped
+    profiles: ["tools"]
+    ports:
+      - "8083:8080"
+    depends_on:
+      - postgres
+
+volumes:
+  servio-pgdata:
+  servio-redisdata:
+  servio-miniodata:

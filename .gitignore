@@ -1,0 +1,3 @@
+# Each project manages its own ignores; this covers root-level cruft only.
+.DS_Store
+*.log
