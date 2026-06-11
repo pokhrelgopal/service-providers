@@ -32,7 +32,7 @@ export function ProviderMenu() {
   const { data: me } = useMe();
 
   return (
-    <div className="fixed left-4 top-4 z-[1000]">
+    <div className="fixed right-4 top-4 z-[1000]">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
@@ -44,7 +44,7 @@ export function ProviderMenu() {
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent
-          align="start"
+          align="end"
           sideOffset={10}
           className="z-[1200] max-h-[80vh] w-64 overflow-y-auto rounded-xl p-1.5"
         >

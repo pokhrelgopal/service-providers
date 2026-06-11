@@ -74,6 +74,24 @@ services:
     ports:
       - "5001:5000"
 
+  # Self-hosted TURN relay for WebRTC calls (see docs/calling-feature.md).
+  # Opt-in: docker compose --profile calls up -d coturn
+  # Then set TURN_URLS=turn:localhost:3478 and TURN_SECRET (matching the conf) in
+  # backend/.env. STUN-only works without this for same-network testing.
+  coturn:
+    image: coturn/coturn:latest
+    container_name: servio-coturn
+    restart: unless-stopped
+    profiles: ["calls"]
+    volumes:
+      - ./docker/coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
+    command: ["-c", "/etc/coturn/turnserver.conf"]
+    ports:
+      - "3478:3478/tcp"
+      - "3478:3478/udp"
+      # Relay range — keep in sync with min-port/max-port in turnserver.conf.
+      - "49160-49200:49160-49200/udp"
+
   # Optional DB UI — start with: docker compose --profile tools up
   adminer:
     image: adminer:latest

@@ -36,6 +36,14 @@ export function EngagementBar() {
   const complete = useCompleteEngagement();
   const [confirmOpen, setConfirmOpen] = useState(false);
 
+  // On (re)connect, re-sync engagement state: while the socket was down we may
+  // have missed `engagement:started`/`engagement:ended`, so the active job /
+  // incoming list could be stale.
+  useSocketEvent("connect", () => {
+    qc.invalidateQueries({ queryKey: ACTIVE_ENGAGEMENT_KEY });
+    qc.invalidateQueries({ queryKey: INCOMING_KEY });
+  });
+
   useSocketEvent("engagement:started", () => {
     qc.invalidateQueries({ queryKey: ACTIVE_ENGAGEMENT_KEY });
     qc.invalidateQueries({ queryKey: INCOMING_KEY });

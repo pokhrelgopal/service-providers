@@ -52,6 +52,16 @@ export const envSchema = z.object({
   // Stripe — deferred to Milestone 11.
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
+
+  // WebRTC calling — ICE servers handed to the browser. STUN is enough on most
+  // networks; TURN (self-hosted coturn) is the relay fallback when a direct
+  // peer-to-peer path is blocked. TURN credentials are minted per request via
+  // HMAC (coturn `use-auth-secret` / "TURN REST" scheme), so we only store the
+  // shared secret here — never long-lived TURN passwords.
+  STUN_URLS: z.string().default('stun:stun.l.google.com:19302'),
+  TURN_URLS: z.string().optional(),
+  TURN_SECRET: z.string().optional(),
+  TURN_TTL: z.coerce.number().int().positive().default(86_400),
 });
 
 export type Env = z.infer<typeof envSchema>;

@@ -8,13 +8,15 @@ import { ArrowLeft2, Call, Gallery, Send2 } from "iconsax-reactjs";
 
 import { cn } from "@/lib/utils";
 import { formatDay, formatTime } from "@/lib/format";
-import { useSocketEvent } from "@/features/realtime";
+import { useSocketEvent, useConnectionState } from "@/features/realtime";
+import { useCall } from "@/features/calls";
 import {
   useActiveEngagement,
   useMessages,
   useSendMessage,
   useSendImage,
   useMarkRead,
+  messagesKey,
   ACTIVE_ENGAGEMENT_KEY,
   type Engagement,
   type ChatMessage,
@@ -32,6 +34,8 @@ export default function ChatPage() {
   const send = useSendMessage(id);
   const sendImage = useSendImage(id);
   const markRead = useMarkRead();
+  const connection = useConnectionState();
+  const call = useCall();
 
   const [text, setText] = useState("");
   const listRef = useRef<HTMLDivElement>(null);
@@ -48,6 +52,15 @@ export default function ChatPage() {
 
   // Keep it read while viewing.
   useSocketEvent("message:new", () => markRead.mutate(id));
+
+  // Re-sync on (re)connect. While the socket was down we may have missed
+  // `message:new` pushes, so refetch the thread from the server — this closes
+  // the "messages sent during a drop never appear" gap. Fires on the initial
+  // connect and on every reconnect.
+  useSocketEvent("connect", () => {
+    qc.invalidateQueries({ queryKey: messagesKey(id) });
+    markRead.mutate(id);
+  });
 
   // Scroll to the latest message — after paint so the full height (and any
   // just-rendered messages) is measured correctly on load.
@@ -85,7 +98,18 @@ export default function ChatPage() {
     e.preventDefault();
     const body = text.trim();
     if (!body) return;
-    send.mutate({ body }, { onSuccess: () => setText("") });
+    setText(""); // clear immediately; the optimistic bubble shows the text
+    send.mutate({ body, tempId: crypto.randomUUID() });
+  }
+
+  // Re-send a message that failed (e.g. sent during an internet drop): drop the
+  // failed bubble and send it again as a fresh optimistic message.
+  function retry(failed: ChatMessage) {
+    if (!failed.body) return;
+    qc.setQueryData<ChatMessage[]>(messagesKey(id), (prev) =>
+      (prev ?? []).filter((m) => m.id !== failed.id),
+    );
+    send.mutate({ body: failed.body, tempId: crypto.randomUUID() });
   }
 
   function pickImage(e: React.ChangeEvent<HTMLInputElement>) {
@@ -125,12 +149,31 @@ export default function ChatPage() {
         </div>
         <button
           type="button"
-          aria-label="Call (coming soon)"
-          className="text-foreground flex size-10 cursor-pointer items-center justify-center rounded-full bg-neutral-100 hover:bg-neutral-200"
+          onClick={call.startCall}
+          disabled={call.status !== "idle"}
+          aria-label="Call"
+          className="text-foreground flex size-10 cursor-pointer items-center justify-center rounded-full bg-neutral-100 hover:bg-neutral-200 disabled:opacity-50"
         >
           <Call size={20} />
         </button>
       </header>
+
+      {/* Connection banner — shown while the device is offline or the socket is
+          reconnecting, so a silent drop is visible to the user. */}
+      {connection !== "online" && (
+        <div
+          className={cn(
+            "shrink-0 px-4 py-1.5 text-center text-xs font-medium",
+            connection === "offline"
+              ? "bg-destructive/10 text-destructive"
+              : "bg-amber-100 text-amber-700",
+          )}
+        >
+          {connection === "offline"
+            ? "No internet connection"
+            : "Reconnecting…"}
+        </div>
+      )}
 
       {/* Messages */}
       <div ref={listRef} className="flex-1 space-y-1.5 overflow-y-auto p-4">
@@ -154,7 +197,11 @@ export default function ChatPage() {
                     </span>
                   </div>
                 )}
-                <MessageRow message={m} avatar={other.avatarUrl} />
+                <MessageRow
+                  message={m}
+                  avatar={other.avatarUrl}
+                  onRetry={retry}
+                />
               </div>
             );
           })
@@ -209,9 +256,11 @@ export default function ChatPage() {
 function MessageRow({
   message,
   avatar,
+  onRetry,
 }: {
   message: ChatMessage;
   avatar: string | null;
+  onRetry: (message: ChatMessage) => void;
 }) {
   const mine = message.mine;
   return (
@@ -240,7 +289,9 @@ function MessageRow({
             mine ? "text-right" : "text-left",
           )}
         >
-          {formatTime(message.createdAt)}
+          {message.status === "sending"
+            ? "Sending…"
+            : formatTime(message.createdAt)}
         </p>
         {message.imageUrl ? (
           <a
@@ -264,10 +315,23 @@ function MessageRow({
               mine
                 ? "bg-primary text-primary-foreground"
                 : "text-foreground bg-neutral-100",
+              message.status === "sending" && "opacity-60",
             )}
           >
             {message.body}
           </span>
+        )}
+        {message.status === "failed" && (
+          <p className="text-destructive mt-0.5 text-right text-[10px]">
+            Not delivered ·{" "}
+            <button
+              type="button"
+              onClick={() => onRetry(message)}
+              className="cursor-pointer font-semibold underline"
+            >
+              Retry
+            </button>
+          </p>
         )}
       </div>
     </div>

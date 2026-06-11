@@ -17,7 +17,7 @@ export default function CompletedJobsPage() {
 
   return (
     <div className="h-full overflow-y-auto bg-gray-100">
-      <div className="mx-auto max-w-2xl px-4 pt-20 pb-12">
+      <div className="mx-auto max-w-2xl px-4 pt-8 pb-12">
         <header className="mb-6">
           <BackToMap href="/dashboard" />
           <h1 className="text-2xl font-bold tracking-tight">Completed Jobs</h1>

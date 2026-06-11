@@ -26,4 +26,14 @@ export const messageSchema = z.object({
   createdAt: z.string(),
   mine: z.boolean(),
 });
-export type ChatMessage = z.infer<typeof messageSchema>;
+
+/**
+ * A chat message. `status` is client-only and present just for *optimistic*
+ * messages we've added locally before the server confirmed them:
+ *  - `sending` — POST in flight
+ *  - `failed`  — POST failed (e.g. internet drop); offer a retry
+ * Confirmed messages from the server have no `status`.
+ */
+export type ChatMessage = z.infer<typeof messageSchema> & {
+  status?: "sending" | "failed";
+};

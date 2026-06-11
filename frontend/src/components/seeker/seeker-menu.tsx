@@ -29,7 +29,7 @@ export function SeekerMenu() {
   const { data: me } = useMe();
 
   return (
-    <div className="fixed top-4 left-4 z-1000">
+    <div className="fixed top-4 right-4 z-1000">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
@@ -41,7 +41,7 @@ export function SeekerMenu() {
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent
-          align="start"
+          align="end"
           sideOffset={10}
           className="z-1200 w-64 rounded-xl p-1.5"
         >

@@ -27,6 +27,7 @@ import { DiscoveryModule } from './discovery/discovery.module';
 import { RequestsModule } from './requests/requests.module';
 import { EngagementsModule } from './engagements/engagements.module';
 import { ReviewsModule } from './reviews/reviews.module';
+import { CallsModule } from './calls/calls.module';
 import { MetricsModule } from './metrics/metrics.module';
 import { RealtimeModule } from './realtime/realtime.module';
 import { MailModule } from './mail/mail.module';
@@ -88,6 +89,7 @@ const isProd = process.env.NODE_ENV === 'production';
     RequestsModule,
     EngagementsModule,
     ReviewsModule,
+    CallsModule,
     MetricsModule,
     MailModule,
   ],

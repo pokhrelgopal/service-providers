@@ -19,9 +19,14 @@ const nextConfig: NextConfig = {
       { protocol: "http", hostname: "localhost", port: "9004" },
     ],
     // Next 16 blocks optimizing upstreams that resolve to private IPs (SSRF
-    // guard). MinIO is on localhost in dev, so allow it there only — prod keeps
-    // the protection (MinIO will be a real host then).
-    dangerouslyAllowLocalIP: process.env.NODE_ENV !== "production",
+    // guard). MinIO is on localhost in dev. `next build && next start` runs as
+    // NODE_ENV=production, which re-enables the guard and breaks local
+    // production builds against local MinIO — so also allow it when the explicit
+    // ALLOW_LOCAL_IMAGE_IP flag is set (kept in .env.local, never shipped).
+    // Real deployments leave the flag unset and keep the protection.
+    dangerouslyAllowLocalIP:
+      process.env.NODE_ENV !== "production" ||
+      process.env.ALLOW_LOCAL_IMAGE_IP === "true",
   },
 };
 

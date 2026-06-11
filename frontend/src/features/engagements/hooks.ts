@@ -74,16 +74,44 @@ export function useMessages(engagementId: string | null) {
   });
 }
 
+/**
+ * Send a text message with an optimistic bubble:
+ *  - `onMutate` immediately appends a local `sending` message (snappy UI, and
+ *    it survives an internet drop instead of silently failing),
+ *  - `onSuccess` swaps it for the confirmed server message,
+ *  - `onError` flags it `failed` so the UI can offer a retry.
+ *
+ * The caller passes a `tempId` (e.g. `crypto.randomUUID()`) used to find the
+ * optimistic message again on success/error.
+ */
 export function useSendMessage(engagementId: string) {
   const qc = useQueryClient();
-  const append = (message: ChatMessage) =>
-    qc.setQueryData<ChatMessage[]>(messagesKey(engagementId), (prev) =>
-      prev ? [...prev, message] : [message],
-    );
+  const key = messagesKey(engagementId);
+  const patch = (updater: (prev: ChatMessage[]) => ChatMessage[]) =>
+    qc.setQueryData<ChatMessage[]>(key, (prev) => updater(prev ?? []));
+
   return useMutation({
-    mutationFn: (payload: { body?: string; imageKey?: string }) =>
-      sendMessage(engagementId, payload),
-    onSuccess: append,
+    mutationFn: (payload: { body: string; tempId: string }) =>
+      sendMessage(engagementId, { body: payload.body }),
+    onMutate: ({ body, tempId }) => {
+      const optimistic: ChatMessage = {
+        id: tempId,
+        body,
+        imageUrl: null,
+        createdAt: new Date().toISOString(),
+        mine: true,
+        status: "sending",
+      };
+      patch((prev) => [...prev, optimistic]);
+    },
+    onSuccess: (serverMessage, { tempId }) => {
+      patch((prev) => prev.map((m) => (m.id === tempId ? serverMessage : m)));
+    },
+    onError: (_err, { tempId }) => {
+      patch((prev) =>
+        prev.map((m) => (m.id === tempId ? { ...m, status: "failed" } : m)),
+      );
+    },
   });
 }
 

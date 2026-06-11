@@ -10,7 +10,10 @@ import { ServiceMap } from "@/components/map";
 import { ProviderDetailDialog } from "@/components/seeker/provider-detail-dialog";
 import { OffersStack } from "@/components/seeker/offers-stack";
 import { BroadcastStatus } from "@/components/seeker/broadcast-status";
-import { SearchDialog, type SearchInput } from "@/components/seeker/search-dialog";
+import {
+  SearchDialog,
+  type SearchInput,
+} from "@/components/seeker/search-dialog";
 import { useMounted } from "@/hooks/use-mounted";
 import { useGeolocation } from "@/hooks/use-geolocation";
 import { useSeekerPin } from "@/hooks/use-seeker-pin";
@@ -186,12 +189,10 @@ function SeekerDiscovery() {
           </div>
           <button
             type="button"
-            onClick={() =>
-              geo.request((c) => setPin(c.latitude, c.longitude))
-            }
+            onClick={() => geo.request((c) => setPin(c.latitude, c.longitude))}
             disabled={geo.loading}
             aria-label="Use my current location"
-            className="absolute right-5 bottom-7 z-1000 flex size-12 cursor-pointer items-center justify-center rounded-full bg-white text-primary shadow-lg ring-1 ring-black/5 transition-transform hover:scale-105 active:scale-95 disabled:opacity-60"
+            className="text-primary absolute right-5 bottom-7 z-1000 flex size-12 cursor-pointer items-center justify-center rounded-full bg-white shadow-lg ring-1 ring-black/5 transition-transform hover:scale-105 active:scale-95 disabled:opacity-60"
           >
             <Location size={22} variant={geo.loading ? "Linear" : "Bold"} />
           </button>
