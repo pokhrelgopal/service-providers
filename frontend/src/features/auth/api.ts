@@ -27,4 +27,10 @@ export async function logoutAll(): Promise<void> {
   await api.post("/auth/logout-all");
 }
 
+/** Soft-deletes the account and signs out everywhere. Reactivates if the user
+ * logs back in within the grace window. */
+export async function deleteAccount(): Promise<void> {
+  await api.post("/auth/delete-account");
+}
+
 export { refreshAccessToken } from "@/lib/axios";

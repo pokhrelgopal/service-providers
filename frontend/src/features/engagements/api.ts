@@ -29,10 +29,33 @@ export async function fetchMessages(
 
 export async function sendMessage(
   engagementId: string,
-  body: string,
+  payload: { body?: string; imageKey?: string },
 ): Promise<ChatMessage> {
-  const res = await api.post(`/engagements/${engagementId}/messages`, { body });
+  const res = await api.post(
+    `/engagements/${engagementId}/messages`,
+    payload,
+  );
   return messageSchema.parse(res.data?.data);
+}
+
+const presignSchema = z.object({ uploadUrl: z.string(), key: z.string() });
+
+/** Get a presigned PUT URL for a chat image, upload the file, return the key. */
+export async function uploadChatImage(
+  engagementId: string,
+  file: File,
+): Promise<string> {
+  const res = await api.post(`/engagements/${engagementId}/image`, {
+    contentType: file.type,
+  });
+  const { uploadUrl, key } = presignSchema.parse(res.data?.data);
+  const put = await fetch(uploadUrl, {
+    method: "PUT",
+    body: file,
+    headers: { "Content-Type": file.type },
+  });
+  if (!put.ok) throw new Error("Image upload failed");
+  return key;
 }
 
 export async function markEngagementRead(engagementId: string): Promise<void> {

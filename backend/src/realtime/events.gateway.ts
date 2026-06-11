@@ -10,12 +10,14 @@ import type { Server, Socket } from 'socket.io';
 import type { Env } from '../config/env.validation';
 import type { AccessTokenPayload } from '../auth/types/jwt-payload.interface';
 
+interface SocketData {
+  userId?: string;
+}
+
 /** Shared JWT-authenticated Socket.IO gateway. Other services emit to specific
  * users via {@link emitToUsers}; clients only ever receive their own events. */
 @WebSocketGateway({ cors: { origin: true, credentials: true } })
-export class EventsGateway
-  implements OnGatewayConnection, OnGatewayDisconnect
-{
+export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer() server!: Server;
   private readonly online = new Map<string, Set<string>>(); // userId -> socketIds
 
@@ -30,7 +32,7 @@ export class EventsGateway
       const payload = await this.jwt.verifyAsync<AccessTokenPayload>(token, {
         secret: this.config.get('JWT_ACCESS_SECRET', { infer: true }),
       });
-      socket.data.userId = payload.sub;
+      (socket.data as SocketData).userId = payload.sub;
       this.track(payload.sub, socket.id);
       await socket.join(`user:${payload.sub}`);
     } catch {
@@ -39,7 +41,7 @@ export class EventsGateway
   }
 
   handleDisconnect(socket: Socket): void {
-    const userId = socket.data.userId as string | undefined;
+    const userId = (socket.data as SocketData).userId;
     if (userId) this.untrack(userId, socket.id);
   }
 

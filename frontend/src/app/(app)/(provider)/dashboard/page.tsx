@@ -4,15 +4,6 @@ import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Location } from "iconsax-reactjs";
 
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { FullScreenLoader } from "@/components/shared/spinner";
 import { ServiceMap } from "@/components/map";
 import { IncomingRequestDialog } from "@/components/provider/incoming-request-dialog";
@@ -20,6 +11,7 @@ import { useMounted } from "@/hooks/use-mounted";
 import { useGeolocation } from "@/hooks/use-geolocation";
 import { useApplication } from "@/features/providers";
 import { useSetAvailability, useSetLocation } from "@/features/location/hooks";
+import { useActiveEngagement } from "@/features/engagements";
 import { useSocketEvent } from "@/features/realtime";
 import { playAppSound, SOUND } from "@/lib/sounds";
 import {
@@ -47,7 +39,7 @@ function ProviderHome() {
   const geo = useGeolocation();
   const respond = useRespondToRequest();
   const withdraw = useWithdrawResponse();
-  const [availOpen, setAvailOpen] = useState(false);
+  const { data: engagement } = useActiveEngagement();
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const hasLocation = app?.latitude != null && app?.longitude != null;
@@ -102,6 +94,11 @@ function ProviderHome() {
   const requests = available && hasLocation ? (incoming ?? []) : [];
   const selectedRequest = requests.find((r) => r.id === selectedId) ?? null;
 
+  // While engaged, route the provider to the seeker's location.
+  const destination: [number, number] | null = engagement?.location
+    ? [engagement.location.latitude, engagement.location.longitude]
+    : null;
+
   return (
     <>
       {/* Full-bleed map — the provider's own exact location (read-only pin). */}
@@ -111,6 +108,12 @@ function ProviderHome() {
           zoom={hasLocation ? 15 : 12}
           zoomControl={false}
           selfMarker={hasLocation ? center : undefined}
+          destinationMarker={destination ?? undefined}
+          route={
+            destination && hasLocation
+              ? { from: center, to: destination }
+              : undefined
+          }
           requests={requests.map((r) => ({
             id: r.id,
             latitude: r.latitude,
@@ -140,88 +143,40 @@ function ProviderHome() {
         </div>
       )}
 
-      {/* Bottom-center: availability status → opens dialog */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-7 z-[1000] flex justify-center px-4">
-        <button
-          type="button"
-          onClick={() => setAvailOpen(true)}
-          className="pointer-events-auto flex h-12 cursor-pointer items-center gap-2.5 rounded-full bg-white pr-5 pl-4 text-sm font-semibold shadow-xl ring-1 ring-black/5 transition-transform hover:scale-[1.02] active:scale-95"
-        >
-          <span
-            className={
-              available
-                ? "size-2.5 rounded-full bg-emerald-500"
-                : "bg-muted-foreground/40 size-2.5 rounded-full"
-            }
-          />
-          {available ? "Available for work" : "Unavailable"}
-        </button>
-      </div>
-
-      {/* Bottom-right: update my exact location */}
-      <button
-        type="button"
-        onClick={captureLocation}
-        disabled={locating}
-        aria-label="Update my location"
-        className="text-primary absolute right-5 bottom-7 z-[1000] flex size-12 cursor-pointer items-center justify-center rounded-full bg-white shadow-lg ring-1 ring-black/5 transition-transform hover:scale-105 active:scale-95 disabled:opacity-60"
-      >
-        <Location size={22} variant={locating ? "Linear" : "Bold"} />
-      </button>
-
-      {/* Availability dialog */}
-      <Dialog open={availOpen} onOpenChange={setAvailOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Availability</DialogTitle>
-            <DialogDescription>
-              Control whether seekers can find and hire you right now.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-1">
-            <div className="flex items-center justify-between gap-4 rounded-xl bg-neutral-200/60 p-4">
-              <div>
-                <p className="font-semibold">Available for work</p>
-                <p className="text-muted-foreground text-sm">
-                  Turn off to temporarily hide from the map.
-                </p>
-              </div>
-              <Switch
-                checked={available}
-                onCheckedChange={(v) => setAvailability.mutate(v)}
-                disabled={setAvailability.isPending}
-                aria-label="Toggle availability"
+      {/* Availability + location controls — hidden while on an active job
+          (the "Work active" bar takes the bottom then). */}
+      {!engagement && (
+        <>
+          <div className="pointer-events-none absolute inset-x-0 bottom-7 z-[1000] flex justify-center px-4">
+            <button
+              type="button"
+              onClick={() => setAvailability.mutate(!available)}
+              disabled={setAvailability.isPending}
+              className="pointer-events-auto flex h-12 cursor-pointer items-center gap-2.5 rounded-full bg-white pr-5 pl-4 text-sm font-semibold shadow-xl ring-1 ring-black/5 transition-transform hover:scale-[1.02] active:scale-95 disabled:opacity-60"
+            >
+              <span
+                className={
+                  available
+                    ? "size-2.5 rounded-full bg-emerald-500"
+                    : "bg-muted-foreground/40 size-2.5 rounded-full"
+                }
               />
-            </div>
-
-            <div className="flex items-center justify-between gap-4 rounded-xl bg-neutral-200/60 p-4">
-              <div>
-                <p className="font-semibold">Your location</p>
-                <p className="text-muted-foreground text-sm">
-                  {hasLocation
-                    ? "Seekers see your exact location."
-                    : "Required to appear in search."}
-                </p>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={captureLocation}
-                disabled={locating}
-                className="gap-1.5 rounded-full"
-              >
-                <Location size={16} variant="Bold" />
-                {locating ? "Locating…" : hasLocation ? "Update" : "Set"}
-              </Button>
-            </div>
-
-            {geo.error && (
-              <p className="text-destructive text-sm">{geo.error}</p>
-            )}
+              {available ? "Available for work" : "Unavailable"}
+            </button>
           </div>
-        </DialogContent>
-      </Dialog>
+
+          {/* Bottom-right: update my exact location (tap the pin) */}
+          <button
+            type="button"
+            onClick={captureLocation}
+            disabled={locating}
+            aria-label="Update my location"
+            className="text-primary absolute right-5 bottom-7 z-[1000] flex size-12 cursor-pointer items-center justify-center rounded-full bg-white shadow-lg ring-1 ring-black/5 transition-transform hover:scale-105 active:scale-95 disabled:opacity-60"
+          >
+            <Location size={22} variant={locating ? "Linear" : "Bold"} />
+          </button>
+        </>
+      )}
 
       {/* Incoming request detail */}
       <IncomingRequestDialog

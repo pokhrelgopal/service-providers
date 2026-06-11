@@ -11,12 +11,8 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { formatDistance } from "@/lib/format";
 import type { IncomingRequest } from "@/features/requests";
-
-function formatDistance(m: number | null) {
-  if (m == null) return null;
-  return m < 1000 ? `${m} m away` : `${(m / 1000).toFixed(1)} km away`;
-}
 
 export function IncomingRequestDialog({
   request,
@@ -36,7 +32,10 @@ export function IncomingRequestDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const open = request != null;
-  const distance = formatDistance(request?.distanceMeters ?? null);
+  const distance =
+    request?.distanceMeters != null
+      ? `${formatDistance(request.distanceMeters)} away`
+      : null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -97,7 +96,7 @@ export function IncomingRequestDialog({
                   variant="ghost"
                   onClick={() => onWithdraw(request.id)}
                   disabled={withdrawing}
-                  className="w-full text-destructive hover:text-destructive"
+                  className="text-destructive hover:text-destructive w-full"
                 >
                   {withdrawing ? "Cancelling…" : "Cancel offer"}
                 </Button>

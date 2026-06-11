@@ -59,6 +59,13 @@ export class ProviderProfile {
   @Column({ default: true })
   isAvailable!: boolean;
 
+  /** Denormalized review aggregate (immutable reviews → sum/count is exact). */
+  @Column({ type: 'int', default: 0 })
+  ratingCount!: number;
+
+  @Column({ type: 'int', default: 0 })
+  ratingSum!: number;
+
   @Column({ type: 'enum', enum: ProviderStatus, default: ProviderStatus.DRAFT })
   status!: ProviderStatus;
 

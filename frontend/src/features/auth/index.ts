@@ -3,10 +3,18 @@ export {
   useOnboarded,
   useLogin,
   useLogout,
+  useLogoutAll,
+  useDeleteAccount,
   loginWithGoogleUrl,
   ME_QUERY_KEY,
 } from "./hooks";
-export { fetchMe, logout, logoutAll, refreshAccessToken } from "./api";
+export {
+  fetchMe,
+  logout,
+  logoutAll,
+  deleteAccount,
+  refreshAccessToken,
+} from "./api";
 export { RequireAuth } from "./components/require-auth";
 export {
   userSchema,

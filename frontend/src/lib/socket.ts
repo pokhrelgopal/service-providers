@@ -27,3 +27,9 @@ export function connectSocket(): Socket {
 export function disconnectSocket(): void {
   if (socket?.connected) socket.disconnect();
 }
+
+/** Fire-and-forget emit (no-op if not connected). */
+export function emitSocket(event: string, payload: unknown): void {
+  const s = getSocket();
+  if (s.connected) s.emit(event, payload);
+}

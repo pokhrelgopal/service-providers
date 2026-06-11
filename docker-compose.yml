@@ -61,6 +61,19 @@ services:
       timeout: 5s
       retries: 10
 
+  # Self-hosted routing (Leaflet Routing Machine → OSRM). Run the one-time data
+  # prep first: ./docker/osrm/prepare.sh   then: docker compose --profile routing up -d osrm
+  osrm:
+    image: osrm/osrm-backend:latest
+    container_name: servio-osrm
+    restart: unless-stopped
+    profiles: ["routing"]
+    command: ["osrm-routed", "--algorithm", "mld", "/data/region.osrm"]
+    volumes:
+      - ./docker/osrm:/data
+    ports:
+      - "5001:5000"
+
   # Optional DB UI — start with: docker compose --profile tools up
   adminer:
     image: adminer:latest

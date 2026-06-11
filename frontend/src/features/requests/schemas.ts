@@ -33,6 +33,8 @@ export const responderSchema = z.object({
   id: z.string(),
   provider: userRefSchema.nullable(),
   distanceMeters: z.number().nullable(),
+  rating: z.number().nullable(),
+  reviewCount: z.number(),
   createdAt: z.string(),
 });
 export type Responder = z.infer<typeof responderSchema>;

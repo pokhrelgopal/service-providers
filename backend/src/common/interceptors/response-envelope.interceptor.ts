@@ -14,8 +14,9 @@ export interface ResponseEnvelope<T> {
 }
 
 /**
- * Wraps successful responses in a consistent envelope. The /health route is
- * left untouched so Terminus keeps its canonical output shape.
+ * Wraps successful responses in a consistent envelope. /health (Terminus) and
+ * /metrics (Prometheus exposition text) are left untouched so their canonical
+ * output shapes are preserved.
  */
 @Injectable()
 export class ResponseEnvelopeInterceptor<T> implements NestInterceptor<
@@ -27,7 +28,7 @@ export class ResponseEnvelopeInterceptor<T> implements NestInterceptor<
     next: CallHandler<T>,
   ): Observable<ResponseEnvelope<T> | T> {
     const req = context.switchToHttp().getRequest<Request>();
-    if (req.url.startsWith('/health')) {
+    if (req.url.startsWith('/health') || req.url.startsWith('/metrics')) {
       return next.handle();
     }
 

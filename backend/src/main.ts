@@ -7,6 +7,7 @@ import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 
 import { AppModule } from './app.module';
+import { RedisIoAdapter } from './realtime/redis-io.adapter';
 import type { Env } from './config/env.validation';
 
 /**
@@ -52,7 +53,16 @@ async function bootstrap() {
   // Prod: restrict to the configured web origin.
   const isProd = config.get('NODE_ENV', { infer: true }) === 'production';
   app.enableCors({ origin: isProd ? [webOrigin] : true, credentials: true });
-  app.setGlobalPrefix('api/v1', { exclude: ['health'] });
+
+  // Redis-backed Socket.IO adapter → events fan out across API instances.
+  const redisAdapter = new RedisIoAdapter(
+    app,
+    config.get('REDIS_URL', { infer: true }),
+  );
+  await redisAdapter.connect();
+  app.useWebSocketAdapter(redisAdapter);
+
+  app.setGlobalPrefix('api/v1', { exclude: ['health', 'metrics'] });
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,

@@ -2,48 +2,20 @@
 
 import Image from "next/image";
 import { Verify, Call, Location, TickCircle } from "iconsax-reactjs";
-import { Star } from "lucide-react";
 
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Stars } from "@/components/shared/stars";
+import { formatDistance } from "@/lib/format";
 import { useProviderDetail, type ProviderCard } from "@/features/discovery";
 
-/** Stable dummy stats derived from the provider id (placeholders until real data lands). */
+/** Placeholder phone + completed-jobs (rating/reviews are real). */
 function dummyStats(id: string) {
   let h = 0;
   for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
-  const rating = Number((4 + (h % 10) / 10).toFixed(1)); // 4.0 – 4.9
-  const reviews = 12 + (h % 240);
   const completedJobs = 24 + (h % 476);
   const phone = `+977 98${String(10000000 + (h % 89999999)).slice(0, 8)}`;
-  return { rating, reviews, completedJobs, phone };
-}
-
-function formatDistance(m: number | null) {
-  if (m == null) return "—";
-  return m < 1000 ? `${m} m` : `${(m / 1000).toFixed(1)} km`;
-}
-
-function Stars({ value }: { value: number }) {
-  return (
-    <span className="flex items-center gap-0.5">
-      {Array.from({ length: 5 }).map((_, i) => (
-        <Star
-          key={i}
-          size={15}
-          className={
-            i + 1 <= Math.round(value)
-              ? "fill-amber-400 text-amber-400"
-              : "text-muted-foreground/30"
-          }
-        />
-      ))}
-    </span>
-  );
+  return { completedJobs, phone };
 }
 
 export function ProviderDetailDialog({
@@ -58,9 +30,10 @@ export function ProviderDetailDialog({
   const { data: detail } = useProviderDetail(provider?.id ?? null);
   const view = detail ?? provider;
 
-  const { rating, reviews, completedJobs, phone } = dummyStats(
-    provider?.id ?? "x",
-  );
+  // Phone + completed-jobs are still placeholders; rating/reviews are real.
+  const { completedJobs, phone } = dummyStats(provider?.id ?? "x");
+  const rating = view?.rating ?? null;
+  const reviews = view?.reviewCount ?? 0;
   const primarySkill = view?.skills[0]?.name;
 
   return (
@@ -115,7 +88,9 @@ export function ProviderDetailDialog({
                 <span className="flex items-center gap-1.5">
                   <Location size={18} className="text-muted-foreground" />
                   <span className="font-semibold">
-                    {formatDistance(provider?.distanceMeters ?? null)}
+                    {provider?.distanceMeters != null
+                      ? formatDistance(provider.distanceMeters)
+                      : "—"}
                   </span>
                   <span className="text-muted-foreground">away</span>
                 </span>
@@ -128,11 +103,19 @@ export function ProviderDetailDialog({
 
               {/* Rating */}
               <div className="mt-3 flex items-center gap-2">
-                <Stars value={rating} />
-                <span className="text-sm font-semibold">{rating}</span>
-                <span className="text-sm text-muted-foreground">
-                  ({reviews})
-                </span>
+                {rating != null ? (
+                  <>
+                    <Stars value={rating} />
+                    <span className="text-sm font-semibold">{rating}</span>
+                    <span className="text-sm text-muted-foreground">
+                      ({reviews})
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-sm text-muted-foreground">
+                    No reviews yet
+                  </span>
+                )}
               </div>
 
               {/* CTA */}

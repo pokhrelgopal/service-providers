@@ -32,8 +32,13 @@ export class Message {
   @JoinColumn({ name: 'senderId' })
   sender?: User;
 
-  @Column('text')
-  body!: string;
+  /** Text body (null for image-only messages). */
+  @Column({ type: 'text', nullable: true })
+  body!: string | null;
+
+  /** MinIO object key for an attached image (null for text-only messages). */
+  @Column({ type: 'varchar', nullable: true })
+  imageKey!: string | null;
 
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;

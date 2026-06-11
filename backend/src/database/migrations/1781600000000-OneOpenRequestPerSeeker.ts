@@ -5,9 +5,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * guarantees at most one OPEN service_request per seeker at the DB level
  * (the service also supersedes previous open ones on create).
  */
-export class OneOpenRequestPerSeeker1781600000000
-  implements MigrationInterface
-{
+export class OneOpenRequestPerSeeker1781600000000 implements MigrationInterface {
   name = 'OneOpenRequestPerSeeker1781600000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

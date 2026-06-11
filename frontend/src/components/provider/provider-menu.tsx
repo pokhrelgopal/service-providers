@@ -4,14 +4,10 @@ import Link from "next/link";
 import Image from "next/image";
 import {
   HamburgerMenu,
-  CalendarTick,
-  Briefcase,
-  Messages1,
-  Box,
+  TickCircle,
   Wallet3,
-  Star1,
   User,
-  MessageQuestion,
+  Setting2,
   Logout,
 } from "iconsax-reactjs";
 
@@ -27,12 +23,8 @@ import { useLogout, useMe } from "@/features/auth";
 const SEP = "my-1.5 h-0 border-t border-dashed border-border bg-transparent";
 
 const ITEMS = [
-  { label: "Booking Requests", href: "/booking-requests", icon: CalendarTick },
-  { label: "My Jobs", href: "/my-jobs", icon: Briefcase },
-  { label: "Messages", href: "/messages", icon: Messages1 },
-  { label: "My Services", href: "/my-services", icon: Box },
+  { label: "Completed Jobs", href: "/completed-jobs", icon: TickCircle },
   { label: "Earnings", href: "/earnings", icon: Wallet3 },
-  { label: "Reviews", href: "/reviews", icon: Star1 },
 ];
 
 export function ProviderMenu() {
@@ -101,9 +93,9 @@ export function ProviderMenu() {
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild className="cursor-pointer gap-2.5 py-2.5">
-            <Link href="/help">
-              <MessageQuestion size={18} className="text-muted-foreground" />
-              Help &amp; Support
+            <Link href="/settings">
+              <Setting2 size={18} className="text-muted-foreground" />
+              Settings
             </Link>
           </DropdownMenuItem>
           <DropdownMenuSeparator className={SEP} />

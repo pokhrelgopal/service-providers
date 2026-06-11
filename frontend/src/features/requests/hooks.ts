@@ -9,7 +9,9 @@ import {
   fetchMyRequest,
   respondToRequest,
   withdrawResponse,
+  rejectOffer,
 } from "./api";
+import type { MyRequest } from "./schemas";
 
 export const MY_REQUEST_KEY = ["requests", "mine"] as const;
 export const INCOMING_KEY = ["requests", "incoming"] as const;
@@ -59,4 +61,30 @@ export function useRespondToRequest() {
 
 export function useWithdrawResponse() {
   return useMutation({ mutationFn: withdrawResponse });
+}
+
+/** Seeker rejects one responder — removes it from the offers stack instantly. */
+export function useRejectOffer() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      requestId,
+      providerId,
+    }: {
+      requestId: string;
+      providerId: string;
+    }) => rejectOffer(requestId, providerId),
+    onMutate: ({ providerId }) => {
+      qc.setQueryData<MyRequest | null>(MY_REQUEST_KEY, (prev) =>
+        prev
+          ? {
+              ...prev,
+              responders: prev.responders.filter(
+                (r) => r.provider?.id !== providerId,
+              ),
+            }
+          : prev,
+      );
+    },
+  });
 }

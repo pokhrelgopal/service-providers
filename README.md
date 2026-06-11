@@ -98,29 +98,78 @@ The frontend exposes only `NEXT_PUBLIC_*` values to the browser.
 
 ## Milestones
 
-Built one milestone at a time (see `instructions.md`). Status:
+Built one milestone at a time (see `instructions.md`). Status — **M0–M10 complete**
+(M11 Payments deferred):
 
-- **M0 — Repo, tooling & design baseline** ✅
-- **M1 — Backend foundation + dev infra** ✅ — docker-compose, env validation, global pipe/filter/envelope, helmet/CORS/throttler, pino + request IDs, TypeORM migrations, `/health`, Swagger
-- **M2 — Auth & identity** ✅ _(current)_ — Google OAuth → JWT access + rotating refresh tokens (revocable in Redis, multi-device), logout/logout-all; role-set `User`; frontend login, axios silent-refresh interceptors, Zustand store, protected layout
-- M3 — Onboarding & profile
-- M4 — Provider application + document uploads
-- M5 — Admin verification / moderation
-- M6 — Location & nearby discovery (map)
-- M7 — Service catalog & search
-- M8 — Realtime: chat, live location, notifications (single socket)
-- M9 — Service request lifecycle + reviews
-- M10 — Hardening & production readiness
-- M11 — Payments with Stripe _(deferred)_
+- **M0–M2** ✅ Repo/tooling/design baseline · backend foundation + dev infra ·
+  Google OAuth → JWT access + rotating refresh tokens (Redis, multi-device).
+- **M3–M5** ✅ Onboarding (seeker 1-click; provider 5-step wizard) · provider
+  application + MinIO document/selfie uploads · admin verification/moderation
+  (password login, approve/reject, "account verified" email via BullMQ).
+- **M6** ✅ Location & nearby discovery — `earthdistance` GiST radius search,
+  Leaflet map. **Provider gives exact GPS; only the seeker pins.**
+- **M7** ✅ **Service-request broadcasts** (replaces the catalog idea): a seeker
+  broadcasts a need (service + description + radius); matching available
+  providers within range see it live as a pulsing **raised-hand** marker and tap
+  **"I can help"** → seeker sees responders in realtime. 30-min expiry.
+- **M8** ✅ Realtime over a single JWT-authed Socket.IO gateway: **accept →
+  engagement** (locks both sides), persistent **chat-head bubble** + minimal chat
+  with an unread badge (per-participant `lastReadAt`).
+- **M9** ✅ Request lifecycle (broadcast → offer → accept → in-progress →
+  seeker-completes) + **ratings & reviews**; aggregate rating on provider cards.
+- **M10** ✅ Hardening — multi-stage prod Dockerfiles (api + web standalone),
+  `docker-compose.prod.yml` + env separation, `/metrics` (Prometheus), demo seed,
+  unit tests, this runbook.
+- **M11** — Payments with Stripe _(deferred until requested)_.
 
-### Milestone 0 — what's here
+> **Model note:** the live product is **broadcast-first** (a seeker doesn't pick
+> one provider to message — they broadcast and providers raise hands), and the
+> provider UI is **map-first / mobile-first** (no dashboard sidebar). These
+> intentionally diverge from the original brief's wording.
 
-- Independent `backend/` (NestJS, strict TS) and `frontend/` (Next.js, strict TS)
-  projects, each with ESLint + Prettier + Husky pre-commit hooks, on separate
-  env-configurable ports.
-- `logistics-pitch` design tokens and UI primitives (Button, Input, Label, Form,
-  Card, Badge, Skeleton, Separator + Container/Eyebrow/SectionHeading/FadeIn)
-  ported into `frontend/src/components`, demonstrated on the landing page.
-- Feature-driven frontend folder skeleton (`features/*`, route groups, `lib`,
-  `stores`).
+## Production
+
+Multi-stage images build the API (`node dist/main`) and the web app (Next.js
+**standalone**). A separate `migrate` service runs migrations as a one-off.
+
+```bash
+# from repo root
+cp .env.prod.example .env.prod          # fill secrets, real domains, OAuth callback
+docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+docker compose -f docker-compose.prod.yml run --rm migrate   # apply migrations
+```
+
+- API → `:5000`, Web → `:3000` (front them with a TLS-terminating reverse proxy).
+- `NEXT_PUBLIC_API_URL`/`NEXT_PUBLIC_SOCKET_URL` are **build-time** for the web
+  image — pass them as build args in CI for a real domain. In dev they're unset
+  and the client derives the API host from the page URL (LAN/mobile works).
+- Google OAuth needs the prod callback whitelisted; it cannot use a private LAN IP.
+
+## Runbook
+
+| Task | Command |
+| ---- | ------- |
+| Apply migrations (dev) | `cd backend && npm run migration:run` |
+| Apply migrations (prod image) | `npm run migration:run:prod` (`-d dist/...`) |
+| Revert last migration | `npm run migration:revert` |
+| Seed demo data (idempotent) | `cd backend && npm run seed:demo` |
+| Run tests | `cd backend && npm test` |
+| Health check | `GET /health` (unprefixed) |
+| Prometheus metrics | `GET /metrics` (unprefixed, raw exposition text) |
+| Self-hosted routing (OSRM) | `./docker/osrm/prepare.sh` once, then `docker compose --profile routing up -d osrm`; set `NEXT_PUBLIC_OSRM_URL=http://localhost:5001/route/v1` |
+| API docs | `GET /api/v1/docs` (Swagger) |
+| Structured logs | pino JSON on stdout (request IDs); pipe to your log sink |
+
+**Seeded accounts.** Admin (password login): `admin@servio.com` / `Password@123`.
+`npm run seed:demo` adds approved demo providers around Kathmandu (with skills +
+ratings) and a demo seeker so the map has content.
+
+**Common issues.**
+
+- _Images don't load over LAN_ — MinIO presigned URLs point at the configured
+  public endpoint; set `S3_PUBLIC_URL` to a host browsers can reach.
+- _Sounds silent_ — react-sounds streams from a CDN (needs internet) and audio
+  unlocks only after a first user gesture; both are expected.
+- _CORS in prod_ — set `WEB_ORIGIN` to the exact web origin (dev reflects any
+  origin; prod restricts to `WEB_ORIGIN`).
 - `.env.example` in each project; this README.

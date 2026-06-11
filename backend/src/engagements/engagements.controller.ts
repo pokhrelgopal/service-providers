@@ -5,8 +5,10 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
+import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -14,6 +16,7 @@ import type { AuthUser } from '../auth/types/jwt-payload.interface';
 import { EngagementsService } from './engagements.service';
 import { AcceptDto } from './dto/accept.dto';
 import { SendMessageDto } from './dto/send-message.dto';
+import { PresignImageDto } from './dto/presign-image.dto';
 
 @ApiTags('engagements')
 @ApiBearerAuth()
@@ -34,6 +37,25 @@ export class EngagementsController {
     return this.engagements.active(user.id);
   }
 
+  /** The seeker's completed jobs, newest first (Request History page). */
+  @Get('history')
+  history(@CurrentUser() user: AuthUser) {
+    return this.engagements.history(user.id);
+  }
+
+  /** The provider's completed jobs, newest first, cursor-paginated. */
+  @Get('completed-jobs')
+  completedJobs(
+    @CurrentUser() user: AuthUser,
+    @Query() query: PaginationQueryDto,
+  ) {
+    return this.engagements.completedJobs(
+      user.id,
+      query.limit ?? 20,
+      query.cursor,
+    );
+  }
+
   @Get(':id/messages')
   messages(
     @CurrentUser() user: AuthUser,
@@ -49,6 +71,16 @@ export class EngagementsController {
     @Body() dto: SendMessageDto,
   ) {
     return this.engagements.send(id, user.id, dto);
+  }
+
+  /** Presign a PUT URL to upload a chat image. */
+  @Post(':id/image')
+  presignImage(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: PresignImageDto,
+  ) {
+    return this.engagements.presignImage(id, user.id, dto);
   }
 
   /** Mark the conversation read (clears the unread badge). */

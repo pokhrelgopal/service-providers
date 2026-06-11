@@ -5,6 +5,7 @@ export {
   useIncomingRequests,
   useRespondToRequest,
   useWithdrawResponse,
+  useRejectOffer,
   MY_REQUEST_KEY,
   INCOMING_KEY,
 } from "./hooks";

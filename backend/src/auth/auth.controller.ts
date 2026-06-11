@@ -149,6 +149,24 @@ export class AuthController {
     return { success: true };
   }
 
+  /**
+   * Delete the current account. Soft-deletes the user and signs them out
+   * everywhere. The account is permanently purged after a grace period; logging
+   * back in before then reactivates it.
+   */
+  @Post('delete-account')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  async deleteAccount(
+    @CurrentUser() user: AuthUser,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    await this.users.deleteAccount(user.id);
+    await this.auth.revokeAll(user.id);
+    res.clearCookie(REFRESH_COOKIE, { path: '/api/v1/auth' });
+    return { success: true };
+  }
+
   /** Current authenticated user. */
   @Get('me')
   @UseGuards(JwtAuthGuard)

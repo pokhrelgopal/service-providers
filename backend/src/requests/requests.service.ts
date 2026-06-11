@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ForbiddenException,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
@@ -9,6 +10,9 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, LessThanOrEqual, Repository } from 'typeorm';
+import { Redis } from 'ioredis';
+
+import { REDIS_CLIENT } from '../redis/redis.constants';
 
 import { User } from '../users/user.entity';
 import { Skill } from '../skills/skill.entity';
@@ -25,6 +29,12 @@ import { CreateRequestDto } from './dto/create-request.dto';
 
 const REQUEST_TTL_MS = 30 * 60 * 1000; // 30 minutes
 const SWEEP_INTERVAL_MS = 30 * 1000; // expire-sweep cadence
+
+interface ResponderInfo {
+  distanceMeters: number;
+  rating: number | null;
+  reviewCount: number;
+}
 
 @Injectable()
 export class RequestsService implements OnModuleInit, OnModuleDestroy {
@@ -44,9 +54,16 @@ export class RequestsService implements OnModuleInit, OnModuleDestroy {
     private readonly users: Repository<User>,
     @InjectRepository(Engagement)
     private readonly engagements: Repository<Engagement>,
+    @Inject(REDIS_CLIENT)
+    private readonly redis: Redis,
     private readonly providers: ProvidersService,
     private readonly gateway: EventsGateway,
   ) {}
+
+  /** Redis key holding the request ids a provider was rejected from. */
+  private rejectedKey(providerId: string): string {
+    return `req-rejected:${providerId}`;
+  }
 
   onModuleInit(): void {
     this.sweepTimer = setInterval(() => {
@@ -143,22 +160,24 @@ export class RequestsService implements OnModuleInit, OnModuleDestroy {
     });
     if (!r || r.expiresAt <= new Date()) return null;
     const responses = r.responses ?? [];
-    const distances = await this.responderDistances(r);
+    const info = await this.responderInfo(r);
     const photos = await this.providers.getSelfieUrlsByUserIds(
       responses.map((x) => x.providerId),
     );
-    return this.presentForSeeker(r, responses, distances, photos);
+    return this.presentForSeeker(r, responses, info, photos);
   }
 
-  /** Distance (m) from the request point to each responding provider. */
-  private async responderDistances(
+  /** Distance + rating for each responding provider, keyed by userId. */
+  private async responderInfo(
     r: ServiceRequest,
-  ): Promise<Map<string, number>> {
+  ): Promise<Map<string, ResponderInfo>> {
     const providerIds = (r.responses ?? []).map((x) => x.providerId);
     if (!providerIds.length) return new Map();
     const rows = await this.profiles
       .createQueryBuilder('p')
       .select('p.userId', 'userId')
+      .addSelect('p.ratingCount', 'ratingCount')
+      .addSelect('p.ratingSum', 'ratingSum')
       .addSelect(
         'earth_distance(ll_to_earth(:lat, :lng), ll_to_earth(p.latitude, p.longitude))',
         'distance',
@@ -166,9 +185,25 @@ export class RequestsService implements OnModuleInit, OnModuleDestroy {
       .where('p."userId" IN (:...providerIds)', { providerIds })
       .andWhere('p.latitude IS NOT NULL AND p.longitude IS NOT NULL')
       .setParameters({ lat: r.latitude, lng: r.longitude })
-      .getRawMany<{ userId: string; distance: string | number }>();
+      .getRawMany<{
+        userId: string;
+        distance: string | number;
+        ratingCount: string | number;
+        ratingSum: string | number;
+      }>();
     return new Map(
-      rows.map((row) => [row.userId, Math.round(Number(row.distance))]),
+      rows.map((row) => {
+        const count = Number(row.ratingCount);
+        const sum = Number(row.ratingSum);
+        return [
+          row.userId,
+          {
+            distanceMeters: Math.round(Number(row.distance)),
+            rating: count > 0 ? Math.round((sum / count) * 10) / 10 : null,
+            reviewCount: count,
+          },
+        ];
+      }),
     );
   }
 
@@ -222,18 +257,26 @@ export class RequestsService implements OnModuleInit, OnModuleDestroy {
       .orderBy('distance', 'ASC')
       .limit(100);
 
-    const { entities, raw } = await qb.getRawAndEntities();
-    const rows = raw as Array<{ distance?: string | number }>;
+    const { entities: allEntities, raw: allRaw } = await qb.getRawAndEntities();
+
+    // Drop requests this provider was rejected from (short-lived, in Redis).
+    const rejected = new Set(
+      await this.redis.smembers(this.rejectedKey(providerUserId)),
+    );
+    const keep = allEntities
+      .map((e, i) => ({ e, distance: (allRaw[i] as { distance?: number })?.distance }))
+      .filter(({ e }) => !rejected.has(e.id));
+
     const respondedIds = await this.respondedRequestIds(
       providerUserId,
-      entities.map((e) => e.id),
+      keep.map(({ e }) => e.id),
     );
-    return entities.map((r, i) =>
+    return keep.map(({ e, distance }) =>
       this.presentForProvider(
-        r,
-        r.seeker ?? null,
-        Number(rows[i]?.distance ?? 0),
-        respondedIds.has(r.id),
+        e,
+        e.seeker ?? null,
+        Number(distance ?? 0),
+        respondedIds.has(e.id),
       ),
     );
   }
@@ -257,6 +300,15 @@ export class RequestsService implements OnModuleInit, OnModuleDestroy {
     if (!r) throw new NotFoundException('Request not found');
     if (r.status !== ServiceRequestStatus.OPEN || r.expiresAt <= new Date()) {
       throw new BadRequestException('This request is no longer open');
+    }
+    const wasRejected = await this.redis.sismember(
+      this.rejectedKey(providerUserId),
+      requestId,
+    );
+    if (wasRejected) {
+      throw new BadRequestException(
+        'You were not selected for this request and can no longer offer on it.',
+      );
     }
 
     const existing = await this.responses.findOne({
@@ -288,6 +340,23 @@ export class RequestsService implements OnModuleInit, OnModuleDestroy {
         providerId: providerUserId,
       });
     }
+    return { ok: true };
+  }
+
+  /** Seeker rejects a provider's offer. Reverts the provider to no-offer state,
+   * drops the request from their map, and blocks them from re-offering on this
+   * same request (short-lived state in Redis ~ request TTL). */
+  async reject(requestId: string, seekerId: string, providerId: string) {
+    const r = await this.requests.findOne({ where: { id: requestId } });
+    if (!r) throw new NotFoundException('Request not found');
+    if (r.seekerId !== seekerId) throw new ForbiddenException();
+
+    await this.responses.delete({ requestId, providerId });
+    const key = this.rejectedKey(providerId);
+    await this.redis.sadd(key, requestId);
+    await this.redis.expire(key, 7200); // > 30-min request lifetime
+    // Drop the raised hand from the rejected provider's map.
+    this.gateway.emitToUser(providerId, 'request:removed', { id: requestId });
     return { ok: true };
   }
 
@@ -408,7 +477,7 @@ export class RequestsService implements OnModuleInit, OnModuleDestroy {
   private presentForSeeker(
     r: ServiceRequest,
     responses: ServiceRequestResponse[],
-    distances: Map<string, number> = new Map(),
+    info: Map<string, ResponderInfo> = new Map(),
     photos: Map<string, string> = new Map(),
   ) {
     return {
@@ -423,13 +492,16 @@ export class RequestsService implements OnModuleInit, OnModuleDestroy {
       createdAt: r.createdAt,
       responders: responses.map((resp) => {
         const u = resp.provider ?? null;
+        const i = info.get(resp.providerId);
         return {
           id: resp.id,
           // Verified uploaded selfie, never the Google avatar.
           provider: u
             ? { id: u.id, name: u.name, avatarUrl: photos.get(u.id) ?? null }
             : null,
-          distanceMeters: distances.get(resp.providerId) ?? null,
+          distanceMeters: i?.distanceMeters ?? null,
+          rating: i?.rating ?? null,
+          reviewCount: i?.reviewCount ?? 0,
           createdAt: resp.createdAt,
         };
       }),

@@ -11,6 +11,9 @@ export const engagementSchema = z.object({
   status: z.string(),
   role: z.enum(["seeker", "provider"]),
   other: engagementOtherSchema.nullable(),
+  location: z
+    .object({ latitude: z.number(), longitude: z.number() })
+    .nullable(),
   unread: z.boolean(),
   createdAt: z.string(),
 });
@@ -18,7 +21,8 @@ export type Engagement = z.infer<typeof engagementSchema>;
 
 export const messageSchema = z.object({
   id: z.string(),
-  body: z.string(),
+  body: z.string().nullable(),
+  imageUrl: z.string().nullable(),
   createdAt: z.string(),
   mine: z.boolean(),
 });

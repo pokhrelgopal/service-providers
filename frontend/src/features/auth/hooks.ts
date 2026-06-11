@@ -6,7 +6,13 @@ import { useRouter } from "next/navigation";
 import { resolveApiUrl } from "@/lib/env";
 import { clearAccessToken, getAccessToken } from "@/lib/auth-token";
 import { isNetworkError } from "@/lib/axios";
-import { fetchMe, login as loginRequest, logout as logoutRequest } from "./api";
+import {
+  fetchMe,
+  login as loginRequest,
+  logout as logoutRequest,
+  logoutAll as logoutAllRequest,
+  deleteAccount as deleteAccountRequest,
+} from "./api";
 
 export const ME_QUERY_KEY = ["auth", "me"] as const;
 
@@ -69,6 +75,38 @@ export function useLogout() {
   return useMutation({
     mutationFn: logoutRequest,
     onSettled: () => {
+      clearAccessToken();
+      queryClient.clear();
+      router.replace("/login");
+    },
+  });
+}
+
+/** Logs out of every device, clears token + cache, returns to /login. */
+export function useLogoutAll() {
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: logoutAllRequest,
+    onSettled: () => {
+      clearAccessToken();
+      queryClient.clear();
+      router.replace("/login");
+    },
+  });
+}
+
+/**
+ * Deletes the account, then clears token + cache and returns to /login. Uses
+ * `onSuccess` (not `onSettled`) so a rejected delete — e.g. the user has a job
+ * in progress — leaves them signed in to see the error.
+ */
+export function useDeleteAccount() {
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: deleteAccountRequest,
+    onSuccess: () => {
       clearAccessToken();
       queryClient.clear();
       router.replace("/login");

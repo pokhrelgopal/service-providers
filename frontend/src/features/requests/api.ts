@@ -38,3 +38,10 @@ export async function respondToRequest(id: string): Promise<void> {
 export async function withdrawResponse(id: string): Promise<void> {
   await api.delete(`/requests/${id}/respond`);
 }
+
+export async function rejectOffer(
+  id: string,
+  providerId: string,
+): Promise<void> {
+  await api.post(`/requests/${id}/reject`, { providerId });
+}

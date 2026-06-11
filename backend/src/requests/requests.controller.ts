@@ -14,6 +14,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthUser } from '../auth/types/jwt-payload.interface';
 import { RequestsService } from './requests.service';
 import { CreateRequestDto } from './dto/create-request.dto';
+import { RejectOfferDto } from './dto/reject-offer.dto';
 
 @ApiTags('requests')
 @ApiBearerAuth()
@@ -56,6 +57,16 @@ export class RequestsController {
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.requests.withdraw(id, user.id);
+  }
+
+  /** Seeker rejects a provider's offer on this request. */
+  @Post(':id/reject')
+  reject(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: RejectOfferDto,
+  ) {
+    return this.requests.reject(id, user.id, dto.providerId);
   }
 
   /** Seeker cancels their broadcast. */

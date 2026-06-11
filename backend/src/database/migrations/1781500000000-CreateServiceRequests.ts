@@ -66,8 +66,12 @@ export class CreateServiceRequests1781500000000 implements MigrationInterface {
     await queryRunner.query(
       `DROP INDEX IF EXISTS "IDX_service_requests_expiresAt"`,
     );
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_service_requests_status"`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_service_requests_status"`,
+    );
     await queryRunner.query(`DROP TABLE IF EXISTS "service_requests"`);
-    await queryRunner.query(`DROP TYPE IF EXISTS "service_requests_status_enum"`);
+    await queryRunner.query(
+      `DROP TYPE IF EXISTS "service_requests_status_enum"`,
+    );
   }
 }

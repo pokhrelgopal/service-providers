@@ -1,0 +1,3 @@
+# OSRM data artifacts (large — built locally via prepare.sh)
+*.osm.pbf
+region.osrm*

@@ -11,6 +11,9 @@ const schema = z.object({
   NEXT_PUBLIC_API_URL: z.string().url().optional(),
   NEXT_PUBLIC_SOCKET_URL: z.string().url().optional(),
   NEXT_PUBLIC_MAP_TILE_URL: z.string().url().optional(),
+  // Self-hosted OSRM routing service (…/route/v1). Falls back to the public
+  // OSRM demo server when unset — fine for dev, not for production.
+  NEXT_PUBLIC_OSRM_URL: z.string().url().optional(),
 });
 
 /** Port the backend is served on (same host as the page in dev). */
@@ -20,6 +23,7 @@ const parsed = schema.safeParse({
   NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
   NEXT_PUBLIC_SOCKET_URL: process.env.NEXT_PUBLIC_SOCKET_URL,
   NEXT_PUBLIC_MAP_TILE_URL: process.env.NEXT_PUBLIC_MAP_TILE_URL,
+  NEXT_PUBLIC_OSRM_URL: process.env.NEXT_PUBLIC_OSRM_URL,
 });
 
 if (!parsed.success) {

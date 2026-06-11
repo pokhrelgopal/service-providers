@@ -4,6 +4,8 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   devIndicators: false,
+  // Self-contained server bundle for a slim production Docker image.
+  output: "standalone",
   allowedDevOrigins: ["192.168.101.12"],
   // Remote image hosts. MinIO/CDN host is added once presigned uploads land
   // (Milestone 3+); stock hosts are useful for placeholder content meanwhile.

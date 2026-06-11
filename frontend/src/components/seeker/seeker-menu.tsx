@@ -5,10 +5,7 @@ import Image from "next/image";
 import {
   HamburgerMenu,
   Clock,
-  Notification,
-  ShieldTick,
   Setting2,
-  MessageQuestion,
   Briefcase,
   Logout,
 } from "iconsax-reactjs";
@@ -24,10 +21,7 @@ import { useLogout, useMe } from "@/features/auth";
 
 const ITEMS = [
   { label: "Request History", href: "/seeker/request-history", icon: Clock },
-  { label: "Notifications", href: "/seeker/notifications", icon: Notification },
-  { label: "Safety", href: "/seeker/safety", icon: ShieldTick },
   { label: "Settings", href: "/seeker/settings", icon: Setting2 },
-  { label: "Help", href: "/seeker/help", icon: MessageQuestion },
 ];
 
 export function SeekerMenu() {

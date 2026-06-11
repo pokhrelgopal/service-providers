@@ -7,6 +7,8 @@ import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FullScreenLoader } from "@/components/shared/spinner";
+import { Panel, Field } from "@/components/provider/profile-panel";
+import { BackToMap } from "@/components/shared/back-to-map";
 import { ROLE_LABELS, useMe } from "@/features/auth";
 import { useApplication, type ProviderApplication } from "@/features/providers";
 
@@ -20,21 +22,6 @@ const STATUS_META: Record<
   rejected: { label: "Rejected", variant: "destructive" },
 };
 
-function Panel({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="rounded-2xl bg-white p-6">
-      <h2 className="mb-4 text-sm font-semibold">{title}</h2>
-      {children}
-    </section>
-  );
-}
-
 export default function ProfilePage() {
   const { data: user } = useMe();
   const { data: app, isLoading } = useApplication();
@@ -44,9 +31,14 @@ export default function ProfilePage() {
   const status = STATUS_META[app.status];
 
   return (
-    <div className="mx-auto flex h-full max-w-3xl flex-col gap-5 overflow-y-auto px-4 pt-20 pb-12">
-      {/* Identity */}
-      <Panel title="My Profile">
+    <div className="h-full overflow-y-auto bg-gray-100">
+      <div className="mx-auto flex max-w-2xl flex-col gap-5 px-4 pt-20 pb-12">
+        <div>
+          <BackToMap href="/dashboard" />
+        </div>
+
+        {/* Identity */}
+        <Panel title="My Profile">
         <div className="flex items-center gap-4">
           {user.avatarUrl ? (
             <Image
@@ -161,26 +153,12 @@ export default function ProfilePage() {
         </div>
       </Panel>
 
-      {(app.status === "draft" || app.status === "rejected") && (
-        <Button asChild className="self-start">
-          <a href="/onboarding/provider">Continue / edit application</a>
-        </Button>
-      )}
-    </div>
-  );
-}
-
-function Field({
-  label,
-  value,
-}: {
-  label: string;
-  value: React.ReactNode;
-}) {
-  return (
-    <div className="flex items-start justify-between gap-4 py-2.5">
-      <dt className="text-muted-foreground">{label}</dt>
-      <dd className="text-right font-medium">{value}</dd>
+        {(app.status === "draft" || app.status === "rejected") && (
+          <Button asChild className="self-start">
+            <a href="/onboarding/provider">Continue / edit application</a>
+          </Button>
+        )}
+      </div>
     </div>
   );
 }

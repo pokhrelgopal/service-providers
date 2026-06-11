@@ -4,6 +4,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { BullModule } from '@nestjs/bullmq';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
 
@@ -25,6 +26,8 @@ import { AdminModule } from './admin/admin.module';
 import { DiscoveryModule } from './discovery/discovery.module';
 import { RequestsModule } from './requests/requests.module';
 import { EngagementsModule } from './engagements/engagements.module';
+import { ReviewsModule } from './reviews/reviews.module';
+import { MetricsModule } from './metrics/metrics.module';
 import { RealtimeModule } from './realtime/realtime.module';
 import { MailModule } from './mail/mail.module';
 import type { Env } from './config/env.validation';
@@ -57,6 +60,7 @@ const isProd = process.env.NODE_ENV === 'production';
     ThrottlerModule.forRoot({
       throttlers: [{ ttl: 60_000, limit: 100 }],
     }),
+    ScheduleModule.forRoot(),
     BullModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService<Env, true>) => {
@@ -83,6 +87,8 @@ const isProd = process.env.NODE_ENV === 'production';
     RealtimeModule,
     RequestsModule,
     EngagementsModule,
+    ReviewsModule,
+    MetricsModule,
     MailModule,
   ],
   controllers: [AppController],

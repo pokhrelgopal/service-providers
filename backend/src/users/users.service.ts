@@ -1,8 +1,15 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import { Injectable, Logger, ConflictException } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { LessThan, Repository } from 'typeorm';
+import { Engagement } from '../engagements/engagement.entity';
+import { EngagementStatus } from '../engagements/engagement-status.enum';
 import { User } from './user.entity';
 import { UserRole } from './user-role.enum';
+
+/** Days a deleted account is kept before it's permanently purged. Logging in
+ * within this window reactivates it. */
+export const ACCOUNT_DELETION_GRACE_DAYS = 15;
 
 export interface GoogleProfile {
   googleId: string;
@@ -13,8 +20,12 @@ export interface GoogleProfile {
 
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
+
   constructor(
     @InjectRepository(User) private readonly users: Repository<User>,
+    @InjectRepository(Engagement)
+    private readonly engagements: Repository<Engagement>,
   ) {}
 
   findById(id: string): Promise<User | null> {
@@ -33,10 +44,16 @@ export class UsersService {
   /** Find an existing user by Google id (or email) or create a fresh one. */
   async findOrCreateFromGoogle(profile: GoogleProfile): Promise<User> {
     const existing = await this.users.findOne({
+      // Include soft-deleted rows so a returning user reactivates their account
+      // instead of being handed a fresh, empty one.
+      withDeleted: true,
       where: [{ googleId: profile.googleId }, { email: profile.email }],
     });
 
     if (existing) {
+      // Reactivate an account that was scheduled for deletion (clear the soft
+      // delete). Logging in is the cancel signal for the 15-day purge.
+      if (existing.deletedAt) existing.deletedAt = null;
       // Backfill googleId / profile details for users that pre-date this login.
       existing.googleId ??= profile.googleId;
       existing.name = existing.name || profile.name;
@@ -52,6 +69,49 @@ export class UsersService {
       roles: [],
     });
     return this.users.save(user);
+  }
+
+  /**
+   * Soft-delete an account. The row is kept (with `deletedAt` set) so the user
+   * can reactivate by logging back in within the grace window; after that it's
+   * permanently purged by {@link purgeExpired}.
+   *
+   * Blocked while the user has a job in progress (as seeker or provider) — they
+   * must finish or hand it off first.
+   */
+  async deleteAccount(id: string): Promise<void> {
+    const activeJobs = await this.engagements.count({
+      where: [
+        { seekerId: id, status: EngagementStatus.ACTIVE },
+        { providerId: id, status: EngagementStatus.ACTIVE },
+      ],
+    });
+    if (activeJobs > 0) {
+      throw new ConflictException(
+        'You have a job in progress. Finish it before deleting your account.',
+      );
+    }
+    await this.users.softDelete({ id });
+  }
+
+  /**
+   * Permanently remove accounts that were soft-deleted longer ago than the
+   * grace window. Returns how many rows were purged. Meant to be run on a
+   * schedule. */
+  async purgeExpired(graceDays = ACCOUNT_DELETION_GRACE_DAYS): Promise<number> {
+    const cutoff = new Date(Date.now() - graceDays * 86_400_000);
+    const res = await this.users.delete({ deletedAt: LessThan(cutoff) });
+    return res.affected ?? 0;
+  }
+
+  /** Daily sweep that permanently removes accounts past the deletion grace
+   * window. Runs every day at 03:00 server time. */
+  @Cron(CronExpression.EVERY_DAY_AT_3AM)
+  async purgeExpiredAccounts(): Promise<void> {
+    const purged = await this.purgeExpired();
+    if (purged > 0) {
+      this.logger.log(`Purged ${purged} expired account(s).`);
+    }
   }
 
   /** Replace a user's role set (used by onboarding in M3). */

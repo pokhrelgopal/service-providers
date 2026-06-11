@@ -52,6 +52,11 @@ function presentProviderCard(
       slug: s.slug,
     })),
     distanceMeters: distanceMeters !== null ? Math.round(distanceMeters) : null,
+    rating:
+      profile.ratingCount > 0
+        ? Math.round((profile.ratingSum / profile.ratingCount) * 10) / 10
+        : null,
+    reviewCount: profile.ratingCount,
   };
 }
 
