@@ -48,6 +48,17 @@ export class ProviderProfile {
   @Column({ type: 'text', nullable: true })
   serviceDescription!: string | null;
 
+  /** Published discovery location (provider's exact GPS — no manual pin). */
+  @Column({ type: 'double precision', nullable: true })
+  latitude!: number | null;
+
+  @Column({ type: 'double precision', nullable: true })
+  longitude!: number | null;
+
+  /** Provider can manually toggle themselves off the map. */
+  @Column({ default: true })
+  isAvailable!: boolean;
+
   @Column({ type: 'enum', enum: ProviderStatus, default: ProviderStatus.DRAFT })
   status!: ProviderStatus;
 

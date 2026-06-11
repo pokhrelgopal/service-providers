@@ -4,12 +4,16 @@ import axios, {
   type InternalAxiosRequestConfig,
 } from "axios";
 
-import { env } from "./env";
+import { resolveApiUrl } from "./env";
 import {
   clearAccessToken,
   getAccessToken,
   setAccessToken,
 } from "./auth-token";
+
+/** Computed once per bundle eval. In the browser this is the page host on
+ * :5000, so LAN/mobile access reaches the right backend automatically. */
+const API_BASE_URL = resolveApiUrl();
 
 /** Normalised error surfaced to the UI / TanStack Query. */
 export interface ApiError {
@@ -46,7 +50,7 @@ function normalizeError(error: unknown): ApiError {
 }
 
 export const api = axios.create({
-  baseURL: env.NEXT_PUBLIC_API_URL,
+  baseURL: API_BASE_URL,
   withCredentials: true, // send the refresh cookie
 });
 
@@ -67,7 +71,7 @@ let refreshPromise: Promise<string | null> | null = null;
 export async function refreshAccessToken(): Promise<string | null> {
   try {
     const res = await axios.post<{ data: { accessToken: string } }>(
-      `${env.NEXT_PUBLIC_API_URL}/auth/refresh`,
+      `${API_BASE_URL}/auth/refresh`,
       {},
       { withCredentials: true },
     );

@@ -33,6 +33,9 @@ export const providerApplicationSchema = z.object({
   serviceDescription: z.string().nullable(),
   rejectionReason: z.string().nullable(),
   submittedAt: z.string().nullable(),
+  latitude: z.number().nullable(),
+  longitude: z.number().nullable(),
+  isAvailable: z.boolean(),
   skills: z.array(skillSchema),
   documents: z.array(providerDocumentSchema),
 });

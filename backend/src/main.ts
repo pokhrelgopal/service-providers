@@ -47,7 +47,11 @@ async function bootstrap() {
 
   app.use(helmet());
   app.use(cookieParser());
-  app.enableCors({ origin: [webOrigin], credentials: true });
+  // Dev: reflect any origin (LAN IPs, mobile, etc.) — a literal "*" is invalid
+  // with credentialed (cookie) requests, so we echo the caller's origin instead.
+  // Prod: restrict to the configured web origin.
+  const isProd = config.get('NODE_ENV', { infer: true }) === 'production';
+  app.enableCors({ origin: isProd ? [webOrigin] : true, credentials: true });
   app.setGlobalPrefix('api/v1', { exclude: ['health'] });
   app.useGlobalPipes(
     new ValidationPipe({

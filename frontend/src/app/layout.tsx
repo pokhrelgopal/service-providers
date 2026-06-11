@@ -16,11 +16,7 @@ const satoshi = localFont({
   display: "swap",
 });
 
-// ─────────────────────────────────────────────────────────────────────────
-// ADMIN PANEL FONT — used only in the admin area (via the `font-admin` class).
-// To try a different font, swap `Inter_Tight` for any next/font/google import
-// (e.g. Manrope, Geist) — this is the single place to change it.
-// ─────────────────────────────────────────────────────────────────────────
+// ADMIN PANEL FONT
 const adminFont = Inter_Tight({
   subsets: ["latin"],
   variable: "--font-admin-src",

@@ -1,13 +1,16 @@
 "use client";
 
-import { useState } from "react";
-
 import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
+import { useApplication } from "@/features/providers";
+import { useSetAvailability } from "@/features/location/hooks";
 
-/** Sidebar availability toggle (UI only for now — not yet wired to the API). */
+/** Sidebar availability toggle — providers can take themselves off the map. */
 export function AvailabilityToggle() {
-  const [available, setAvailable] = useState(true);
+  const { data: app } = useApplication();
+  const setAvailability = useSetAvailability();
+
+  const available = app?.isAvailable ?? true;
 
   return (
     <div className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 group-data-[collapsible=icon]:hidden">
@@ -24,7 +27,8 @@ export function AvailabilityToggle() {
       </div>
       <Switch
         checked={available}
-        onCheckedChange={setAvailable}
+        onCheckedChange={(v) => setAvailability.mutate(v)}
+        disabled={setAvailability.isPending || !app}
         aria-label="Toggle availability"
       />
     </div>

@@ -17,6 +17,8 @@ import { UpdateApplicationDto } from './dto/update-application.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { PresignDocumentDto } from './dto/presign-document.dto';
 import { ConfirmDocumentDto } from './dto/confirm-document.dto';
+import { SetLocationDto } from './dto/set-location.dto';
+import { SetAvailabilityDto } from './dto/set-availability.dto';
 
 @ApiTags('provider')
 @ApiBearerAuth()
@@ -28,6 +30,26 @@ export class ProvidersController {
   /** Current user's provider application (creates a draft on first call). */
   @Get('me')
   getMine(@CurrentUser() user: AuthUser) {
+    return this.providers.getApplicationView(user.id);
+  }
+
+  /** Set the provider's exact discovery location (device GPS). */
+  @Patch('location')
+  async setLocation(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: SetLocationDto,
+  ) {
+    await this.providers.setLocation(user.id, dto.latitude, dto.longitude);
+    return this.providers.getApplicationView(user.id);
+  }
+
+  /** Toggle whether the provider appears on the map. */
+  @Patch('availability')
+  async setAvailability(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: SetAvailabilityDto,
+  ) {
+    await this.providers.setAvailability(user.id, dto.isAvailable);
     return this.providers.getApplicationView(user.id);
   }
 

@@ -44,7 +44,7 @@ export default function ProfilePage() {
   const status = STATUS_META[app.status];
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-5">
+    <div className="mx-auto flex h-full max-w-3xl flex-col gap-5 overflow-y-auto px-4 pt-20 pb-12">
       {/* Identity */}
       <Panel title="My Profile">
         <div className="flex items-center gap-4">

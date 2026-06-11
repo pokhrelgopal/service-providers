@@ -4,7 +4,7 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   devIndicators: false,
-
+  allowedDevOrigins: ["192.168.101.12"],
   // Remote image hosts. MinIO/CDN host is added once presigned uploads land
   // (Milestone 3+); stock hosts are useful for placeholder content meanwhile.
   images: {

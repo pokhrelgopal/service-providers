@@ -22,6 +22,10 @@ import { SkillsModule } from './skills/skills.module';
 import { ProvidersModule } from './providers/providers.module';
 import { OnboardingModule } from './onboarding/onboarding.module';
 import { AdminModule } from './admin/admin.module';
+import { DiscoveryModule } from './discovery/discovery.module';
+import { RequestsModule } from './requests/requests.module';
+import { EngagementsModule } from './engagements/engagements.module';
+import { RealtimeModule } from './realtime/realtime.module';
 import { MailModule } from './mail/mail.module';
 import type { Env } from './config/env.validation';
 
@@ -75,6 +79,10 @@ const isProd = process.env.NODE_ENV === 'production';
     ProvidersModule,
     OnboardingModule,
     AdminModule,
+    DiscoveryModule,
+    RealtimeModule,
+    RequestsModule,
+    EngagementsModule,
     MailModule,
   ],
   controllers: [AppController],

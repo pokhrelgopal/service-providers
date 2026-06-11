@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 
-import { env } from "@/lib/env";
+import { resolveApiUrl } from "@/lib/env";
 import { clearAccessToken, getAccessToken } from "@/lib/auth-token";
 import { isNetworkError } from "@/lib/axios";
 import { fetchMe, login as loginRequest, logout as logoutRequest } from "./api";
@@ -47,7 +47,7 @@ export function useOnboarded() {
 
 /** Full-page navigation to the backend Google OAuth entrypoint. */
 export function loginWithGoogleUrl(): string {
-  return `${env.NEXT_PUBLIC_API_URL}/auth/google`;
+  return `${resolveApiUrl()}/auth/google`;
 }
 
 /** Email + password login. Refreshes `me`; the caller redirects on success. */

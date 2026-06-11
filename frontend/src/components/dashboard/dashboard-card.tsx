@@ -28,7 +28,7 @@ export function DashboardCard({
   return (
     <div
       className={cn(
-        "flex h-fit w-full flex-col justify-between gap-3 rounded-lg border border-[#DFE3E550] bg-white p-4 shadow-sm",
+        "flex h-fit w-full flex-col justify-between gap-3 rounded-lg border border-gray-200/70 bg-white p-4",
         className,
       )}
     >

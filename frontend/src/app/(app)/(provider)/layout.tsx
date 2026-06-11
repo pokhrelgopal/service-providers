@@ -1,17 +1,19 @@
 import { RequireAuth } from "@/features/auth";
-import { ProviderShell } from "@/components/provider/provider-shell";
+import { ProviderMenu } from "@/components/provider/provider-menu";
 
-/** Provider-only area: requires the provider role, wrapped in the dashboard shell. */
+/** Provider-only area: map-first, mobile-first. No sidebar — a floating
+ * hamburger menu (present on every page) replaces it. */
 export default function ProviderLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   return (
-    <div className="font-provider">
-      <RequireAuth requireRole="provider" roleFallback="/seeker">
-        <ProviderShell>{children}</ProviderShell>
-      </RequireAuth>
-    </div>
+    <RequireAuth requireRole="provider" roleFallback="/seeker">
+      <div className="font-provider relative h-dvh w-full overflow-hidden">
+        {children}
+        <ProviderMenu />
+      </div>
+    </RequireAuth>
   );
 }

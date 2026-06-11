@@ -7,13 +7,14 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { MailService } from '../mail/mail.service';
 import { Redis } from 'ioredis';
 import { REDIS_CLIENT } from '../redis/redis.constants';
 import { StorageService } from '../storage/storage.service';
 import { SkillsService } from '../skills/skills.service';
 import { UsersService } from '../users/users.service';
+import { UserRole } from '../users/user-role.enum';
 import { ProviderProfile } from './provider-profile.entity';
 import { Document } from './document.entity';
 import { ProviderStatus } from './provider-status.enum';
@@ -31,6 +32,28 @@ const EXT_BY_MIME: Record<string, string> = {
   'image/png': 'png',
   'image/webp': 'webp',
 };
+
+/** Public-facing provider card for discovery. Uses the public Google avatar —
+ * never the private selfie/ID documents. */
+function presentProviderCard(
+  profile: ProviderProfile,
+  distanceMeters: number | null,
+) {
+  return {
+    id: profile.id,
+    name: profile.user?.name ?? null,
+    avatarUrl: profile.user?.avatarUrl ?? null,
+    serviceDescription: profile.serviceDescription,
+    latitude: profile.latitude,
+    longitude: profile.longitude,
+    skills: (profile.skills ?? []).map((s) => ({
+      id: s.id,
+      name: s.name,
+      slug: s.slug,
+    })),
+    distanceMeters: distanceMeters !== null ? Math.round(distanceMeters) : null,
+  };
+}
 
 @Injectable()
 export class ProvidersService {
@@ -330,6 +353,9 @@ export class ProvidersService {
       serviceDescription: profile.serviceDescription,
       rejectionReason: profile.rejectionReason,
       submittedAt: profile.submittedAt,
+      latitude: profile.latitude,
+      longitude: profile.longitude,
+      isAvailable: profile.isAvailable,
       skills: (profile.skills ?? []).map((s) => ({
         id: s.id,
         name: s.name,
@@ -337,6 +363,125 @@ export class ProvidersService {
       })),
       documents,
     };
+  }
+
+  /* -------------------------- Location & availability -------------------------- */
+
+  /** Set the provider's exact discovery location (from device GPS). */
+  async setLocation(
+    userId: string,
+    latitude: number,
+    longitude: number,
+  ): Promise<ProviderProfile> {
+    const profile = await this.getOrCreateDraft(userId);
+    profile.latitude = latitude;
+    profile.longitude = longitude;
+    await this.profiles.save(profile);
+    return this.getOrCreateDraft(userId);
+  }
+
+  /** Toggle whether the provider appears on the map. */
+  async setAvailability(
+    userId: string,
+    isAvailable: boolean,
+  ): Promise<ProviderProfile> {
+    const profile = await this.getOrCreateDraft(userId);
+    profile.isAvailable = isAvailable;
+    await this.profiles.save(profile);
+    return this.getOrCreateDraft(userId);
+  }
+
+  /* ------------------------------- Discovery -------------------------------- */
+
+  /**
+   * Approved, available, located providers within `radius` metres of (lat,lng),
+   * sorted by distance. earth_box is the index-backed bounding-box prefilter;
+   * earth_distance refines + sorts.
+   */
+  async findNearby(
+    lat: number,
+    lng: number,
+    radius: number,
+    skill?: string,
+  ): Promise<Array<ReturnType<typeof presentProviderCard>>> {
+    const qb = this.profiles
+      .createQueryBuilder('p')
+      .leftJoinAndSelect('p.user', 'u')
+      .leftJoinAndSelect('p.skills', 's')
+      .where('p.status = :status', { status: ProviderStatus.APPROVED })
+      .andWhere('p.isAvailable = true')
+      .andWhere(`'provider' = ANY(u.roles)`)
+      .andWhere('p.latitude IS NOT NULL AND p.longitude IS NOT NULL')
+      .andWhere(
+        'earth_box(ll_to_earth(:lat, :lng), :radius) @> ll_to_earth(p.latitude, p.longitude)',
+      )
+      .andWhere(
+        'earth_distance(ll_to_earth(:lat, :lng), ll_to_earth(p.latitude, p.longitude)) <= :radius',
+      )
+      .setParameters({ lat, lng, radius })
+      .addSelect(
+        'earth_distance(ll_to_earth(:lat, :lng), ll_to_earth(p.latitude, p.longitude))',
+        'distance',
+      )
+      .orderBy('distance', 'ASC')
+      .limit(100);
+
+    if (skill) {
+      qb.andWhere(
+        `EXISTS (SELECT 1 FROM "provider_profile_skills" pps
+                 JOIN "skills" sk ON sk."id" = pps."skillsId"
+                 WHERE pps."providerProfilesId" = p."id" AND sk."slug" = :skill)`,
+        { skill },
+      );
+    }
+
+    const { entities, raw } = await qb.getRawAndEntities();
+    const rows = raw as Array<{ distance?: string | number }>;
+    return entities.map((profile, i) =>
+      presentProviderCard(profile, Number(rows[i]?.distance ?? 0)),
+    );
+  }
+
+  /** Public provider detail (approved providers only). Shows the provider's own
+   * uploaded selfie (presigned) rather than the Google avatar. */
+  async getPublicProfile(id: string) {
+    const profile = await this.profiles.findOne({
+      where: { id, status: ProviderStatus.APPROVED },
+      relations: { user: true, skills: true, documents: true },
+    });
+    if (!profile || !profile.user?.roles?.includes(UserRole.PROVIDER)) {
+      throw new NotFoundException('Provider not found');
+    }
+    const card = presentProviderCard(profile, null);
+    const selfie = (profile.documents ?? []).find(
+      (d) => d.type === DocumentType.SELFIE,
+    );
+    if (selfie) {
+      card.avatarUrl = await this.storage.presignedGet(selfie.objectKey);
+    }
+    return card;
+  }
+
+  /** Map of userId → presigned uploaded-selfie URL for the given providers.
+   * Used wherever a provider's verified photo should replace the Google avatar. */
+  async getSelfieUrlsByUserIds(
+    userIds: string[],
+  ): Promise<Map<string, string>> {
+    if (!userIds.length) return new Map();
+    const profiles = await this.profiles.find({
+      where: { userId: In(userIds) },
+      relations: { documents: true },
+    });
+    const out = new Map<string, string>();
+    for (const p of profiles) {
+      const selfie = (p.documents ?? []).find(
+        (d) => d.type === DocumentType.SELFIE,
+      );
+      if (selfie) {
+        out.set(p.userId, await this.storage.presignedGet(selfie.objectKey));
+      }
+    }
+    return out;
   }
 
   private assertEditable(profile: ProviderProfile): void {
